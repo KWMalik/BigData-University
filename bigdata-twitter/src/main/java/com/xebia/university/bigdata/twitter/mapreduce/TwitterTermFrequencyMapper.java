@@ -20,7 +20,8 @@ public class TwitterTermFrequencyMapper extends Mapper<LongWritable, Text, Text,
 	private Set<String> terms;
 	
 	private Text outputKey;
-	private LongWritable outputValue;
+	private static final LongWritable ONE = new LongWritable(1L);
+	private static final LongWritable ZERO = new LongWritable(0L);
 	
 	private DateFormat readFormat = new SimpleDateFormat("EEE MMM d H:m:s Z y"); //e.g. Fri Feb 25 14:04:46 +0000 2011
 	private DateFormat writeFormat = new SimpleDateFormat("yyyyMMdd"); //e.g. 20110225
@@ -32,8 +33,6 @@ public class TwitterTermFrequencyMapper extends Mapper<LongWritable, Text, Text,
 		terms = new HashSet<String>(Arrays.asList(termConfig));
 		
 		outputKey = new Text();
-		outputValue = new LongWritable();
-		outputValue.set(1L);
 		
 		textSeperator = context.getConfiguration().get("mapred.textoutputformat.separator", "\t");
 	}
@@ -49,13 +48,24 @@ public class TwitterTermFrequencyMapper extends Mapper<LongWritable, Text, Text,
 			
 			if (text != null) {
 				String[] words = text.split("[\\s\\.\\,]+");
-				for (String word : words) {
-					if (terms.contains(word)) {
-						outputKey.set(outputDateString + textSeperator + word);
-						context.write(outputKey, outputValue);
+				
+				for (String term : terms) {
+					boolean occured = false;
+					for (String word : words) {
+						outputKey.set(outputDateString + textSeperator + term);
+						if (term.equalsIgnoreCase(word)) {
+							context.write(outputKey, ONE);
+							occured = true;
+							break;
+						}
+					}
+					
+					if (!occured) {
+						context.write(outputKey, ZERO);
 					}
 				}
 			}
+			
 		} catch(Exception e) {
 			context.getCounter(Counters.PARSE_ERRORS).increment(1L);
 		}
